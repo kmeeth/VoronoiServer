@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## What this is
+
+VoronoiServer is a real-time, multi-user collaborative Voronoi diagram. The server holds one global set of seed points on a plane; every connected client renders the same set of points and the Voronoi tessellation derived from them, updated live as anyone makes changes.
+
+**Shared state:** a set of points on a plane. Each point has a color attribute (chosen by the user who created it, or random) and that color is global — everyone sees the same colors.
+
+**User actions (concurrent, free-for-all):**
+1. Add a point — click-to-place within the bounded plane. No other constraints (no dedup, no per-user limits).
+2. Delete an existing point — any user can delete any point, regardless of who created it.
+
+**Realtime:** mutations propagate to all connected clients instantly.
+
 ## Commands
 
 ```bash
