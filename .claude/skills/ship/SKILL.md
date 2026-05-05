@@ -15,9 +15,10 @@ Before claiming any check passed *because of your change*, know what was already
 
 ## 2. Run the local checks
 
+Run lint and type-check together so Turbo parallelizes them across packages — sequential `pnpm lint; pnpm check-types` wastes ~60s per ship.
+
 ```bash
-pnpm lint
-pnpm check-types
+pnpm turbo run lint check-types
 ```
 
 Compare output to baseline. Don't shrug off new errors as "probably pre-existing" — verify.
@@ -26,16 +27,34 @@ Compare output to baseline. Don't shrug off new errors as "probably pre-existing
 
 This repo uses `node-linker=hoisted` (Expo + pnpm constraint). With React 18 on mobile and React 19 on web, long-lived `node_modules` resolve types non-deterministically — `pnpm check-types` on the local install can pass while a fresh checkout fails, or vice versa.
 
-For PRs that touch types, package.json, or anything that depends on `node_modules` shape, verify in a fresh worktree and treat *that* result as authoritative:
+**Decide whether you need this step.** Judge from the diff: does the change plausibly affect how the type system resolves modules? Pure app code (a component, a page, a route handler that doesn't change exports) does *not* — skip the clean-worktree check, it's 5+ minutes of nothing. If you're not sure, fall back to this trigger list and run the check when **any** of these are touched:
+
+- `packages/api/src/index.ts` or its public type surface (anything `appRouter` exposes)
+- any `package.json` (deps, devDeps, scripts that affect tooling)
+- `pnpm-lock.yaml`
+- any `tsconfig*.json` or `packages/typescript-config/**`
+- `.npmrc`
+
+When you do run it, use the **persistent** verification worktree at `D:/wt-verify` so subsequent ships skip the install cost. First-time setup (one-off, ~5 min):
 
 ```bash
-git worktree add -f D:/wt-verify <branch-name>
+git worktree add -f --detach D:/wt-verify
 cd D:/wt-verify && pnpm install
-cd D:/wt-verify && pnpm check-types
-cd D:/wt-verify && pnpm lint
 ```
 
-For pure markdown / config edits, skip this — there's nothing for the type system to disagree with.
+For each ship that needs the check (~10s if lockfile unchanged, ~30s with delta):
+
+```bash
+cd D:/wt-verify && git fetch origin && git checkout --detach origin/<branch-name>
+cd D:/wt-verify && pnpm install
+cd D:/wt-verify && pnpm turbo run lint check-types
+```
+
+`--detach` keeps the worktree off any named branch so it doesn't conflict with the active checkout in the main worktree. Treat the verification worktree's result as authoritative when local and clean disagree.
+
+Do **not** remove `D:/wt-verify` after — leave it parked. It's reused next ship.
+
+For pure markdown / config edits, skip this entirely — there's nothing for the type system to disagree with.
 
 ## 4. UI changes: see them, don't guess
 
@@ -106,12 +125,9 @@ Don't ship temporary state.
 ```bash
 # Kill the dev server (port 3000)
 Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-
-# Remove the verification worktree if used
-git worktree remove D:/wt-verify --force
 ```
 
-Delete `screenshot.png` and any other scratch files. `git status` should show only the intentional changes.
+Leave `D:/wt-verify` alone — it's persistent (see §3). Delete `screenshot.png` and any other scratch files. `git status` should show only the intentional changes.
 
 ## 6. Commit
 
