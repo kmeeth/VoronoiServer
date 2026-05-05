@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Delaunay } from "d3-delaunay";
 import { trpc } from "../utils/trpc";
 
 const WIDTH = 800;
 const HEIGHT = 600;
 const POINT_RADIUS = 4;
+const CELL_FILL_ALPHA = 0.45;
 
 function randomColor(): string {
   const hue = Math.floor(Math.random() * 360);
@@ -27,11 +29,41 @@ export default function Home() {
     if (!ctx) return;
 
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    for (const point of pointsQuery.data ?? []) {
-      ctx.fillStyle = point.color;
+
+    const points = pointsQuery.data ?? [];
+    if (points.length > 0) {
+      const delaunay = Delaunay.from(
+        points,
+        (p) => p.x,
+        (p) => p.y,
+      );
+      const voronoi = delaunay.voronoi([0, 0, WIDTH, HEIGHT]);
+
+      ctx.save();
+      ctx.globalAlpha = CELL_FILL_ALPHA;
+      for (let i = 0; i < points.length; i++) {
+        ctx.beginPath();
+        voronoi.renderCell(i, ctx);
+        ctx.fillStyle = points[i]!.color;
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.beginPath();
+      voronoi.render(ctx);
+      ctx.strokeStyle = "#333";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    for (const point of points) {
       ctx.beginPath();
       ctx.arc(point.x, point.y, POINT_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
       ctx.fill();
+      ctx.strokeStyle = "#222";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
   }, [pointsQuery.data]);
 
