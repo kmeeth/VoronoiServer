@@ -37,5 +37,5 @@ yarn-error.log*
 .DS_Store
 *.pem
 
-# Claude Code
-.claude/
+# Claude Code — track shared skills/agents/settings, ignore per-user local state
+.claude/settings.local.json
