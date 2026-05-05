@@ -38,6 +38,8 @@ pnpm install
 
 Mobile (`apps/mobile`) uses `expo start` under the hood, which is interactive. It must be run separately from the Turbo dev task.
 
+For interactive UI verification (modifier keys, hover, clicks), drive the running web app with `node apps/web/scripts/screenshot.mjs <out-dir>` — the static `playwright screenshot` CLI can't simulate input. Extend that script for new interactive states rather than re-inventing it.
+
 ## Architecture
 
 This is a pnpm + Turborepo monorepo with two apps and three shared packages.
