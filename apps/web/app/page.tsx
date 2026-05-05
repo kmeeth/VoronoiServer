@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Delaunay } from "d3-delaunay";
+import type { Point } from "@repo/api";
 import { trpc } from "../utils/trpc";
 
 const WIDTH = 800;
@@ -19,13 +20,36 @@ function randomColor(): string {
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const utils = trpc.useUtils();
-  const pointsQuery = trpc.getPoints.useQuery();
-  const addPoint = trpc.addPoint.useMutation({
-    onSuccess: () => utils.getPoints.invalidate(),
+  const pointsQuery = trpc.getPoints.useQuery(undefined, {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
-  const deletePoint = trpc.deletePoint.useMutation({
-    onSuccess: () => utils.getPoints.invalidate(),
-  });
+  const addPoint = trpc.addPoint.useMutation();
+  const deletePoint = trpc.deletePoint.useMutation();
+
+  useEffect(() => {
+    const source = new EventSource("/api/events");
+
+    source.addEventListener("snapshot", (e) => {
+      utils.getPoints.setData(undefined, JSON.parse(e.data) as Point[]);
+    });
+    source.addEventListener("added", (e) => {
+      const { point } = JSON.parse(e.data) as { point: Point };
+      utils.getPoints.setData(undefined, (prev) => {
+        if (!prev) return [point];
+        if (prev.some((p) => p.id === point.id)) return prev;
+        return [...prev, point];
+      });
+    });
+    source.addEventListener("removed", (e) => {
+      const { id } = JSON.parse(e.data) as { id: string };
+      utils.getPoints.setData(undefined, (prev) =>
+        prev ? prev.filter((p) => p.id !== id) : prev,
+      );
+    });
+
+    return () => source.close();
+  }, [utils]);
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
@@ -157,15 +181,11 @@ export default function Home() {
       <div
         style={{
           marginBottom: 8,
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
+          color: "#666",
+          fontSize: 14,
         }}
       >
-        <button onClick={() => utils.getPoints.invalidate()}>Refresh</button>
-        <span style={{ color: "#666", fontSize: 14 }}>
-          {points?.length ?? 0} points · click to add · shift-click to delete
-        </span>
+        {points?.length ?? 0} points · click to add · shift-click to delete
       </div>
       <canvas
         ref={canvasRef}

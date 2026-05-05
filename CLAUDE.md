@@ -63,9 +63,11 @@ This is a pnpm + Turborepo monorepo with two apps and three shared packages.
 3. Both `apps/web` and `apps/mobile` can call it using the `trpc` client exported from their respective `utils/trpc.ts`
 4. React Query providers are set up in `apps/web/app/providers.tsx` and `apps/mobile/app/_layout.tsx`
 
-### Realtime (current: pull-based)
+### Realtime (SSE)
 
-The product spec calls for instant propagation, but the current implementation uses a manual Refresh button that re-runs `getPoints`. All point data flows through a single React Query cache entry, so the planned swap to push-based realtime is a one-file change — a subscription handler writes into the cache instead of a button click. SSE is the leading candidate over WebSocket because it works inside Next.js route handlers without a separate process.
+Mutations propagate live via Server-Sent Events. The store (`packages/api/src/store.ts`) emits events on `add`/`remove`; the route at `apps/web/app/api/events/route.ts` streams a `snapshot` on connect followed by `added`/`removed` events. The web client opens an `EventSource` and writes directly into the React Query cache for `getPoints` (`apps/web/app/page.tsx`). Mutations are fire-and-forget — the SSE echo is the source of truth, so clients never diverge from the server.
+
+Single-process only: the emitter lives in module memory. Multi-instance fan-out (Redis pub/sub, etc.) is deferred until there's a reason to scale horizontally.
 
 ### Key constraints
 
