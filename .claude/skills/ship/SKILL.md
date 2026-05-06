@@ -35,24 +35,24 @@ This repo uses `node-linker=hoisted` (Expo + pnpm constraint). With React 18 on 
 - any `tsconfig*.json` or `packages/typescript-config/**`
 - `.npmrc`
 
-When you do run it, use the **persistent** verification worktree at `D:/wt-verify` so subsequent ships skip the install cost. First-time setup (one-off, ~5 min):
+When you do run it, use the **persistent** verification worktree at `./wt-verify` (inside the project root, gitignored) so subsequent ships skip the install cost. First-time setup (one-off, ~5 min):
 
 ```bash
-git worktree add -f --detach D:/wt-verify
-cd D:/wt-verify && pnpm install
+git worktree add -f --detach ./wt-verify
+cd ./wt-verify && pnpm install
 ```
 
 For each ship that needs the check (~10s if lockfile unchanged, ~30s with delta):
 
 ```bash
-cd D:/wt-verify && git fetch origin && git checkout --detach origin/<branch-name>
-cd D:/wt-verify && pnpm install
-cd D:/wt-verify && pnpm turbo run lint check-types
+cd ./wt-verify && git fetch origin && git checkout --detach origin/<branch-name>
+cd ./wt-verify && pnpm install
+cd ./wt-verify && pnpm turbo run lint check-types
 ```
 
 `--detach` keeps the worktree off any named branch so it doesn't conflict with the active checkout in the main worktree. Treat the verification worktree's result as authoritative when local and clean disagree.
 
-Do **not** remove `D:/wt-verify` after — leave it parked. It's reused next ship.
+Do **not** remove `./wt-verify` after — leave it parked. It's reused next ship.
 
 For pure markdown / config edits, skip this entirely — there's nothing for the type system to disagree with.
 
@@ -127,7 +127,7 @@ Don't ship temporary state.
 Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 ```
 
-Leave `D:/wt-verify` alone — it's persistent (see §3). Delete `screenshot.png` and any other scratch files. `git status` should show only the intentional changes.
+Leave `./wt-verify` alone — it's persistent (see §3). Delete `screenshot.png` and any other scratch files. `git status` should show only the intentional changes.
 
 ## 6. Commit
 
