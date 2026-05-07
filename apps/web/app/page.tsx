@@ -8,8 +8,6 @@ import { trpc } from "../utils/trpc";
 const WIDTH = 800;
 const HEIGHT = 600;
 const POINT_RADIUS = 4;
-const CELL_FILL_ALPHA = 0.45;
-const CELL_FILL_ALPHA_HIGHLIGHT = 0.8;
 const HIGHLIGHT_COLOR = "#e11d48";
 const SELECTED_RING = "#222";
 const SWATCH_BASE_STYLE: React.CSSProperties = {
@@ -23,16 +21,21 @@ const SWATCH_BASE_STYLE: React.CSSProperties = {
 
 type Hsl = { h: number; s: number; l: number };
 
+const DEFAULT_COLOR: Hsl = { h: 220, s: 70, l: 50 };
+
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, v));
+
 function hslToCss({ h, s, l }: Hsl): string {
   return `hsl(${Math.round(h)}, ${Math.round(s)}%, ${Math.round(l)}%)`;
 }
 
-function randomColor(): string {
-  return hslToCss({
+function randomHsl(): Hsl {
+  return {
     h: Math.random() * 360,
     s: 40 + Math.random() * 60,
     l: 25 + Math.random() * 50,
-  });
+  };
 }
 
 function hexToHsl(hex: string): Hsl {
@@ -68,7 +71,9 @@ function hslToHex({ h, s, l }: Hsl): string {
   const c = (1 - Math.abs(2 * lN - 1)) * sN;
   const hp = h / 60;
   const x = c * (1 - Math.abs((hp % 2) - 1));
-  let r = 0, g = 0, b = 0;
+  let r = 0,
+    g = 0,
+    b = 0;
   if (hp < 1) [r, g, b] = [c, x, 0];
   else if (hp < 2) [r, g, b] = [x, c, 0];
   else if (hp < 3) [r, g, b] = [0, c, x];
@@ -83,44 +88,23 @@ function hslToHex({ h, s, l }: Hsl): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-const VARIANTS: ReadonlyArray<{ s: number; l: number }> = [
-  { s: 70, l: 50 }, // pure
-  { s: 60, l: 72 }, // light
-  { s: 75, l: 32 }, // dark
-  { s: 32, l: 55 }, // muted
-];
+const lighter = (c: Hsl): Hsl => ({ h: c.h, s: c.s, l: clamp(c.l + 18, 0, 88) });
+const darker = (c: Hsl): Hsl => ({ h: c.h, s: c.s, l: clamp(c.l - 22, 12, 100) });
+const muted = (c: Hsl): Hsl => ({ h: c.h, s: clamp(c.s * 0.4, 15, 100), l: c.l });
 
-const TRIADIC_VARIANTS: ReadonlyArray<{ s: number; l: number }> = [
-  { s: 70, l: 50 },
-  { s: 50, l: 62 },
-];
-
-type Swatch = { css: string; hue: number };
-
-function derivePalette(h: number): {
-  same: Swatch[];
-  complement: Swatch[];
-  triadic: Swatch[];
+function derivePalette(current: Hsl): {
+  same: Hsl[];
+  complement: Hsl[];
+  triadic: Hsl[];
 } {
-  const same = VARIANTS.map((v) => ({
-    css: hslToCss({ h, s: v.s, l: v.l }),
-    hue: h,
-  }));
-  const complementHue = (h + 180) % 360;
-  const complement = VARIANTS.map((v) => ({
-    css: hslToCss({ h: complementHue, s: v.s, l: v.l }),
-    hue: complementHue,
-  }));
-  const triadic: Swatch[] = [];
-  for (const triHue of [(h + 120) % 360, (h + 240) % 360]) {
-    for (const v of TRIADIC_VARIANTS) {
-      triadic.push({
-        css: hslToCss({ h: triHue, s: v.s, l: v.l }),
-        hue: triHue,
-      });
-    }
-  }
-  return { same, complement, triadic };
+  const comp: Hsl = { h: (current.h + 180) % 360, s: current.s, l: current.l };
+  const tri1: Hsl = { h: (current.h + 120) % 360, s: current.s, l: current.l };
+  const tri2: Hsl = { h: (current.h + 240) % 360, s: current.s, l: current.l };
+  return {
+    same: [current, lighter(current), darker(current), muted(current)],
+    complement: [comp, lighter(comp), darker(comp), muted(comp)],
+    triadic: [tri1, muted(tri1), tri2, muted(tri2)],
+  };
 }
 
 export default function Home() {
@@ -159,26 +143,10 @@ export default function Home() {
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
-  const [currentHue, setCurrentHue] = useState(220);
-  const [activeColor, setActiveColor] = useState<string | null>(null);
-  const palette = useMemo(() => derivePalette(currentHue), [currentHue]);
-  const customHex = useMemo(
-    () => hslToHex({ h: currentHue, s: 70, l: 50 }),
-    [currentHue],
-  );
-
-  const selectSwatch = (swatch: Swatch) => {
-    setActiveColor(swatch.css);
-    setCurrentHue(swatch.hue);
-  };
-
-  const selectCustom = (hex: string) => {
-    const { h } = hexToHsl(hex);
-    setCurrentHue(h);
-    setActiveColor(hex);
-  };
-
-  const selectRandom = () => setActiveColor(null);
+  const [currentColor, setCurrentColor] = useState<Hsl>(DEFAULT_COLOR);
+  const palette = useMemo(() => derivePalette(currentColor), [currentColor]);
+  const currentCss = useMemo(() => hslToCss(currentColor), [currentColor]);
+  const customHex = useMemo(() => hslToHex(currentColor), [currentColor]);
 
   const points = pointsQuery.data;
 
@@ -229,16 +197,12 @@ export default function Home() {
         ? hoveredIndex
         : null;
 
-    ctx.save();
     for (let i = 0; i < points.length; i++) {
       ctx.beginPath();
       voronoi.renderCell(i, ctx);
       ctx.fillStyle = points[i]!.color;
-      ctx.globalAlpha =
-        i === previewIndex ? CELL_FILL_ALPHA_HIGHLIGHT : CELL_FILL_ALPHA;
       ctx.fill();
     }
-    ctx.restore();
 
     ctx.beginPath();
     voronoi.render(ctx);
@@ -286,7 +250,7 @@ export default function Home() {
       return;
     }
 
-    addPoint.mutate({ x, y, color: activeColor ?? randomColor() });
+    addPoint.mutate({ x, y, color: currentCss });
   };
 
   const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -302,17 +266,18 @@ export default function Home() {
 
   const handleMouseLeave = () => setHoveredIndex(null);
 
-  const renderSwatch = (swatch: Swatch) => {
-    const isSelected = activeColor === swatch.css;
+  const renderSwatch = (color: Hsl, key: string) => {
+    const css = hslToCss(color);
+    const isSelected = css === currentCss;
     return (
       <button
-        key={`${swatch.css}-${swatch.hue}`}
+        key={key}
         type="button"
-        aria-label={`Pick ${swatch.css}`}
-        onClick={() => selectSwatch(swatch)}
+        aria-label={`Pick ${css}`}
+        onClick={() => setCurrentColor(color)}
         style={{
           ...SWATCH_BASE_STYLE,
-          background: swatch.css,
+          background: css,
           outline: isSelected ? `2px solid ${SELECTED_RING}` : "none",
           outlineOffset: 2,
         }}
@@ -341,9 +306,9 @@ export default function Home() {
       >
         <button
           type="button"
-          aria-label="Random color"
-          onClick={selectRandom}
-          title="Random color on each click"
+          aria-label="Roll random color"
+          onClick={() => setCurrentColor(randomHsl())}
+          title="Roll a random color"
           style={{
             ...SWATCH_BASE_STYLE,
             background:
@@ -354,27 +319,24 @@ export default function Home() {
             justifyContent: "center",
             fontSize: 14,
             textShadow: "0 0 2px rgba(0,0,0,0.6)",
-            outline:
-              activeColor === null ? `2px solid ${SELECTED_RING}` : "none",
-            outlineOffset: 2,
           }}
         >
           ?
         </button>
-        <div style={{ display: "flex", gap: 4 }}>{palette.same.map(renderSwatch)}</div>
         <div style={{ display: "flex", gap: 4 }}>
-          {palette.complement.map(renderSwatch)}
+          {palette.same.map((c, i) => renderSwatch(c, `same-${i}`))}
         </div>
         <div style={{ display: "flex", gap: 4 }}>
-          {palette.triadic.map(renderSwatch)}
+          {palette.complement.map((c, i) => renderSwatch(c, `comp-${i}`))}
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {palette.triadic.map((c, i) => renderSwatch(c, `tri-${i}`))}
         </div>
         <input
           type="color"
           aria-label="Custom color"
-          value={
-            activeColor && activeColor.startsWith("#") ? activeColor : customHex
-          }
-          onChange={(e) => selectCustom(e.target.value)}
+          value={customHex}
+          onChange={(e) => setCurrentColor(hexToHsl(e.target.value))}
           style={{
             width: 28,
             height: 28,
