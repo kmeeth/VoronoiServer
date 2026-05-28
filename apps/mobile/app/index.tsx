@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   canvas: {
-    aspectRatio: WIDTH / HEIGHT,
+    flex: 1,
     width: "100%",
     borderWidth: 1,
     borderColor: "#ccc",
