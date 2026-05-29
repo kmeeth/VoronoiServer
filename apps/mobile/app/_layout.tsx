@@ -5,12 +5,19 @@ import { Stack } from "expo-router";
 import { useState } from "react";
 import { trpc } from "../utils/trpc";
 
-// Use the Metro bundler host (set by Expo when starting the dev server) so the
-// API URL resolves to the dev machine's LAN IP on real devices and Android
-// emulators, not the device's own loopback.
-const debuggerHost = Constants.expoConfig?.hostUri;
-const apiHost = debuggerHost?.split(":")[0] ?? "localhost";
-const API_URL = `http://${apiHost}:3000/api/trpc`;
+// On native, derive the API host from the Metro bundler URL (Expo sets it to
+// the dev machine's LAN IP, which devices and Android emulators can reach —
+// `localhost` would resolve to the device's own loopback). On web, use the URL
+// the page was loaded from, since `hostUri` is null in the browser.
+function deriveApiUrl(): string {
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:3000/api/trpc`;
+  }
+  const apiHost = Constants.expoConfig?.hostUri?.split(":")[0] ?? "localhost";
+  return `http://${apiHost}:3000/api/trpc`;
+}
+
+const API_URL = deriveApiUrl();
 
 export default function RootLayout() {
   const [queryClient] = useState(() => new QueryClient());
