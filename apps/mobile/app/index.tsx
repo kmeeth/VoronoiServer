@@ -3,12 +3,15 @@ import { View, Text, StyleSheet } from "react-native";
 import Svg, { Polygon, Circle, Rect } from "react-native-svg";
 import { Delaunay } from "d3-delaunay";
 import { trpc } from "../utils/trpc";
+import { useRealtimePoints } from "../utils/useRealtimePoints";
 
 const WIDTH = 800;
 const HEIGHT = 600;
 const POINT_RADIUS = 4;
 
 export default function HomeScreen() {
+  useRealtimePoints();
+
   const pointsQuery = trpc.getPoints.useQuery(undefined, {
     staleTime: Infinity,
     refetchOnWindowFocus: false,

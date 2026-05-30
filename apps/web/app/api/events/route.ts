@@ -3,6 +3,20 @@ import { listPoints, subscribePoints, type PointEvent } from "@repo/api";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Let the Expo dev server (a different origin under `expo start --web`) consume
+// the stream. Dev-only, matching the tRPC route's CORS. The `react-native-sse`
+// polyfill sends a `Cache-Control` request header, which is not CORS-safelisted
+// and so triggers a preflight — hence the OPTIONS handler and Allow-Headers.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "*",
+};
+
+export function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export function GET(req: Request) {
   const encoder = new TextEncoder();
 
@@ -42,6 +56,7 @@ export function GET(req: Request) {
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      ...CORS_HEADERS,
     },
   });
 }
