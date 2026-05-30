@@ -33,10 +33,8 @@ export default function HomeScreen() {
 
   // The canvas renders the 800×600 viewBox letterboxed (xMidYMid meet) into a
   // flex-sized View, so screen-space presses must be mapped back into viewBox
-  // coordinates. We measure the View's window rect on layout, then convert a
-  // press's absolute `pageX/pageY` into canvas space and invert the aspect-fit
-  // transform. (`pageX/pageY` is populated for both touch and pointer events;
-  // `locationX/locationY` is not, under react-native-web.)
+  // coordinates. We measure the View's window rect on layout for its size (and
+  // as a web fallback for position).
   const canvasRef = useRef<View>(null);
   const canvasRect = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -50,8 +48,15 @@ export default function HomeScreen() {
   const toViewBox = (e: GestureResponderEvent): { x: number; y: number } | null => {
     const { x: rx, y: ry, width: cw, height: ch } = canvasRect.current;
     if (cw === 0 || ch === 0) return null;
-    const localX = e.nativeEvent.pageX - rx;
-    const localY = e.nativeEvent.pageY - ry;
+    // Prefer locationX/locationY — they're relative to the canvas and free of
+    // the status-bar/header offset that measureInWindow can introduce on
+    // Android. react-native-web leaves them empty for synthetic touch, so fall
+    // back to absolute pageX/pageY minus the measured canvas position there.
+    const ne = e.nativeEvent;
+    const hasLocal =
+      Number.isFinite(ne.locationX) && Number.isFinite(ne.locationY);
+    const localX = hasLocal ? ne.locationX : ne.pageX - rx;
+    const localY = hasLocal ? ne.locationY : ne.pageY - ry;
     const scale = Math.min(cw / WIDTH, ch / HEIGHT);
     const offsetX = (cw - WIDTH * scale) / 2;
     const offsetY = (ch - HEIGHT * scale) / 2;
