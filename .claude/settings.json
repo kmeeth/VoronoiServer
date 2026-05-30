@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm turbo run lint check-types)",
+      "Bash(pnpm turbo run lint check-types --force)",
+      "Bash(pnpm check-types)",
+      "Bash(pnpm lint)"
+    ]
+  }
+}
