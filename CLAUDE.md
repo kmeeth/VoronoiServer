@@ -29,6 +29,9 @@ pnpm build
 pnpm lint
 pnpm check-types
 
+# Run unit tests (vitest; currently the mobile geometry/colour helpers)
+pnpm test
+
 # Format
 pnpm format
 
@@ -48,7 +51,7 @@ This is a pnpm + Turborepo monorepo with two apps and three shared packages.
 
 **`apps/web`** — Next.js 16 (React 19). Serves both the frontend and the tRPC backend. The API lives at `app/api/trpc/[trpc]/route.ts` using Next.js route handlers. The frontend connects to it via a relative URL (`/api/trpc`), so there is no separate backend process.
 
-**`apps/mobile`** — Expo SDK 52 (React 18, React Native 0.76) with Expo Router. Connects to the `apps/web` tRPC endpoint at `http://localhost:3000/api/trpc`. Metro is configured in `metro.config.js` to watch the monorepo root so it can resolve workspace packages.
+**`apps/mobile`** — Expo SDK 54 (React 19, React Native 0.81) with Expo Router. Connects to the `apps/web` tRPC endpoint at `http://localhost:3000/api/trpc`. Metro is configured in `metro.config.js` to watch the monorepo root so it can resolve workspace packages. Pure helpers (letterbox coordinate mapping, nearest-seed lookup, HSL palette math) live in `apps/mobile/utils/` with colocated `*.test.ts` vitest specs.
 
 ### Packages
 
@@ -72,5 +75,5 @@ Single-process only: the emitter lives in module memory. Multi-instance fan-out 
 ### Key constraints
 
 - `node-linker=hoisted` is set in `.npmrc` globally — required for Expo/React Native to resolve dependencies correctly with pnpm.
-- React version differs between apps: web uses React 19, mobile uses React 18 (Expo SDK 52 constraint).
+- Both apps run React 19. (Mobile was on React 18 under Expo SDK 52; the SDK 54 upgrade brought it to parity.)
 - `packages/ui` does not exist — UI components are not shared between web and mobile due to incompatible rendering primitives (HTML vs native).
