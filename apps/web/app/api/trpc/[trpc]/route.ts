@@ -2,8 +2,10 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "@repo/api";
 import type { NextRequest } from "next/server";
 
-// Allow the Expo dev server (a different origin in `expo start --web`) to call
-// the tRPC endpoint. Dev-only concern — production would tighten this.
+// Allow any browser origin (e.g. the Expo web target, a different origin under
+// `expo start --web`) to call the tRPC endpoint. The wildcard is intentional in
+// production too: this is a public, unauthenticated API over non-sensitive data
+// (a shared set of points), so there's nothing to protect by restricting origins.
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
