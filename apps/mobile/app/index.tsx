@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,10 @@ import { hslToString, randomHSL, type HSL } from "../utils/colors";
 const WIDTH = 800;
 const HEIGHT = 600;
 const POINT_RADIUS = 4;
+const DELETE_COLOR = "#e11d48";
+// How long a press must dwell before previewing the cell it would delete —
+// long enough to skip incidental taps, short enough to telegraph the delete.
+const PREVIEW_DELAY = 180;
 
 export default function HomeScreen() {
   useRealtimePoints();
@@ -30,6 +34,8 @@ export default function HomeScreen() {
   const points = pointsQuery.data;
 
   const [selected, setSelected] = useState<HSL>(() => randomHSL());
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The canvas renders the 800×600 viewBox letterboxed (xMidYMid meet) into a
   // flex-sized View, so screen-space presses must be mapped back into viewBox
@@ -78,21 +84,47 @@ export default function HomeScreen() {
   };
 
   // A Voronoi cell is the region nearest its seed, so the cell under a press is
-  // simply the closest seed — no per-polygon hit test needed.
-  const handleLongPress = (e: GestureResponderEvent) => {
-    const p = toViewBox(e);
-    if (!p || !points || points.length === 0) return;
-    let nearestId: string | null = null;
+  // the closest seed — no per-polygon hit test needed.
+  const nearestId = (px: number, py: number): string | null => {
+    if (!points || points.length === 0) return null;
+    let id: string | null = null;
     let best = Infinity;
     for (const pt of points) {
-      const d = (pt.x - p.x) ** 2 + (pt.y - p.y) ** 2;
+      const d = (pt.x - px) ** 2 + (pt.y - py) ** 2;
       if (d < best) {
         best = d;
-        nearestId = pt.id;
+        id = pt.id;
       }
     }
-    if (nearestId) deletePoint.mutate({ id: nearestId });
+    return id;
   };
+
+  const clearPreview = () => {
+    if (previewTimer.current) {
+      clearTimeout(previewTimer.current);
+      previewTimer.current = null;
+    }
+    setPendingDeleteId(null);
+  };
+
+  // Telegraph which cell a sustained press will delete, once it has dwelled
+  // past PREVIEW_DELAY (so a quick tap-to-add never flashes it).
+  const handlePressIn = (e: GestureResponderEvent) => {
+    const p = toViewBox(e);
+    if (!p) return;
+    previewTimer.current = setTimeout(() => {
+      setPendingDeleteId(nearestId(p.x, p.y));
+    }, PREVIEW_DELAY);
+  };
+
+  const handleLongPress = (e: GestureResponderEvent) => {
+    const p = toViewBox(e);
+    if (!p) return;
+    const id = nearestId(p.x, p.y);
+    if (id) deletePoint.mutate({ id });
+  };
+
+  useEffect(() => () => clearPreview(), []);
 
   const cells = useMemo(() => {
     if (!points || points.length === 0) return null;
@@ -129,6 +161,8 @@ export default function HomeScreen() {
         ref={canvasRef}
         style={styles.canvas}
         onLayout={onCanvasLayout}
+        onPressIn={handlePressIn}
+        onPressOut={clearPreview}
         onPress={handleAdd}
         onLongPress={handleLongPress}
         delayLongPress={350}
@@ -146,8 +180,8 @@ export default function HomeScreen() {
                 key={`cell-${c.id}`}
                 points={c.polygon.map(([x, y]) => `${x},${y}`).join(" ")}
                 fill={c.color}
-                stroke="#333"
-                strokeWidth={1}
+                stroke={c.id === pendingDeleteId ? DELETE_COLOR : "#333"}
+                strokeWidth={c.id === pendingDeleteId ? 4 : 1}
               />
             ) : null,
           )}
@@ -156,9 +190,9 @@ export default function HomeScreen() {
               key={`pt-${c.id}`}
               cx={c.x}
               cy={c.y}
-              r={POINT_RADIUS}
+              r={c.id === pendingDeleteId ? POINT_RADIUS + 1 : POINT_RADIUS}
               fill="#fff"
-              stroke="#222"
+              stroke={c.id === pendingDeleteId ? DELETE_COLOR : "#222"}
               strokeWidth={1.5}
             />
           ))}
