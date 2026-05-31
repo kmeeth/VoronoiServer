@@ -3,8 +3,9 @@ import { listPoints, subscribePoints, type PointEvent } from "@repo/api";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Let the Expo dev server (a different origin under `expo start --web`) consume
-// the stream. Dev-only, matching the tRPC route's CORS. The `react-native-sse`
+// Let any browser origin (e.g. the Expo web target under `expo start --web`)
+// consume the stream. Wildcard intentional in production too, matching the tRPC
+// route — public, unauthenticated, non-sensitive data. The `react-native-sse`
 // polyfill sends a `Cache-Control` request header, which is not CORS-safelisted
 // and so triggers a preflight — hence the OPTIONS handler and Allow-Headers.
 const CORS_HEADERS = {
