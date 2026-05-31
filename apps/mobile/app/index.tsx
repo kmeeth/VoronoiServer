@@ -11,6 +11,7 @@ import { Delaunay } from "d3-delaunay";
 import { trpc } from "../utils/trpc";
 import { useRealtimePoints } from "../utils/useRealtimePoints";
 import { Palette } from "../components/Palette";
+import { HslSliders } from "../components/HslSliders";
 import { hslToString, randomHSL, type HSL } from "../utils/colors";
 
 const WIDTH = 800;
@@ -150,6 +151,7 @@ export default function HomeScreen() {
         onPick={setSelected}
         onRandom={() => setSelected(randomHSL())}
       />
+      <HslSliders selected={selected} onChange={setSelected} />
       <Text style={styles.status}>
         {pointsQuery.isLoading
           ? "loading…"
