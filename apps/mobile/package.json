@@ -7,7 +7,9 @@
     "dev": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "vitest run",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -33,6 +35,7 @@
     "@repo/typescript-config": "workspace:*",
     "@types/d3-delaunay": "^6.0.4",
     "@types/react": "~19.1.10",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^4.0.0"
   }
 }
