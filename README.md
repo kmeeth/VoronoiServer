@@ -4,10 +4,10 @@ A real-time, multi-user collaborative Voronoi diagram. The server holds a single
 
 ## Status
 
-The web canvas renders the Voronoi tessellation for the current set of points (cells filled with each seed's color, dark cell boundaries, white-bordered seed markers). Adding (click) and deleting (shift-click) work end-to-end and propagate live to all connected clients via Server-Sent Events. The mobile client is at parity: tap to add, long-press to delete (with a delete-target preview), palette and custom HSL color pickers, and the same live SSE updates. Caveats:
+The web canvas renders the Voronoi tessellation for the current set of points (cells filled with each seed's color, dark cell boundaries, white-bordered seed markers). Adding (click) and deleting (shift-click) work end-to-end; every client polls for the shared point set on a short interval, so changes propagate to all connected clients within ~1.5s. The mobile client is at parity: tap to add, long-press to delete (with a delete-target preview), palette and custom HSL color pickers, and the same live updates. Caveats:
 
 - Server state is in-memory; restarting the server clears all points.
-- Single-process only — no fan-out across instances.
+- Single-process only — the point set lives in module memory, so multiple instances wouldn't share state. A shared database is the next step (and what makes serverless deployment viable).
 
 ## Stack
 

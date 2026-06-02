@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 
 // Drives the mobile-web build to verify tap-to-add and long-press-to-delete
-// against the live tRPC + SSE backend. Run with both dev servers up:
+// against the live tRPC backend. Run with both dev servers up:
 //   web   → http://localhost:3000
 //   expo  → http://localhost:8082
 //

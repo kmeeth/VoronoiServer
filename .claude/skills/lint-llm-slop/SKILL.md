@@ -78,7 +78,7 @@ These shape what counts as slop *here*:
 - **No shared UI package** — incompatible primitives (HTML vs native). Don't propose extracting components across `apps/web` and `apps/mobile`.
 - **No test runner**. Don't suggest test-related cleanups; there's nothing to break.
 - **tRPC procedures live in `packages/api/src/root.ts`**. Don't reorganize procedures or types unprompted — both apps depend on these.
-- **SSE realtime is single-process by design** (`packages/api/src/store.ts`). Don't flag the in-memory store or the EventEmitter as "should be a service" — that's deferred infrastructure, not slop.
+- **State is an in-memory map, single-process by design** (`packages/api/src/store.ts`). Don't flag the in-memory store as "should be a service" or "needs a database" — that's deferred infrastructure, not slop.
 - **`node-linker=hoisted`** is required for Expo + pnpm. Don't suggest `.npmrc` changes.
 
 ## Aggressiveness
@@ -86,7 +86,7 @@ These shape what counts as slop *here*:
 **Aggressive** by default — apply both **[C]** and **[A]** patterns from the catalog. The user picked this level; honor it.
 
 Skip and surface (don't auto-apply) when uncertain:
-- Removing `useEffect` in favor of derived state — too easy to break SSE / mutation timing.
+- Removing `useEffect` in favor of derived state — the canvas-render and key-listener effects have lifecycle subtleties that are easy to break.
 - Deleting exports from `packages/api` — the mobile app may consume them even if web doesn't.
 - Renaming public-facing identifiers in `packages/api/src/root.ts`.
 

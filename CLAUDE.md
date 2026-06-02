@@ -66,11 +66,11 @@ This is a pnpm + Turborepo monorepo with two apps and three shared packages.
 3. Both `apps/web` and `apps/mobile` can call it using the `trpc` client exported from their respective `utils/trpc.ts`
 4. React Query providers are set up in `apps/web/app/providers.tsx` and `apps/mobile/app/_layout.tsx`
 
-### Realtime (SSE)
+### Realtime (polling)
 
-Mutations propagate live via Server-Sent Events. The store (`packages/api/src/store.ts`) emits events on `add`/`remove`; the route at `apps/web/app/api/events/route.ts` streams a `snapshot` on connect followed by `added`/`removed` events. The web client opens an `EventSource` and writes directly into the React Query cache for `getPoints` (`apps/web/app/page.tsx`). Mutations are fire-and-forget — the SSE echo is the source of truth, so clients never diverge from the server.
+Clients stay in sync by polling, not pushing. Both frontends call `getPoints` with React Query's `refetchInterval` (1500ms), so another client's add/delete shows up within a tick. Mutations additionally `invalidate` `getPoints` on success (`apps/web/app/page.tsx`, `apps/mobile/app/index.tsx`), so your own edits appear immediately instead of waiting for the next poll. The store (`packages/api/src/store.ts`) is a plain in-memory map with no event emitter — `getPoints` reads it on demand.
 
-Single-process only: the emitter lives in module memory. Multi-instance fan-out (Redis pub/sub, etc.) is deferred until there's a reason to scale horizontally.
+This pull model is deliberately serverless-friendly: it has no long-lived connections, so it works unchanged across ephemeral, multi-instance hosting (e.g. Vercel) once the store is backed by a shared database rather than module memory. It replaced an earlier SSE transport (server-emitter + `EventSource`), which couldn't survive serverless's stateless, per-instance model. The tradeoff is latency (bounded by the interval) and steady polling traffic in exchange for that simplicity.
 
 ### Key constraints
 
