@@ -18,18 +18,19 @@ const SWATCH_BASE_STYLE: React.CSSProperties = {
   cursor: "pointer",
 };
 
-type Hsl = { h: number; s: number; l: number };
+type HSL = { h: number; s: number; l: number };
 
-const DEFAULT_COLOR: Hsl = { h: 220, s: 70, l: 50 };
+const DEFAULT_COLOR: HSL = { h: 220, s: 70, l: 50 };
 
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.max(lo, Math.min(hi, v));
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
+}
 
-function hslToCss({ h, s, l }: Hsl): string {
+function hslToCss({ h, s, l }: HSL): string {
   return `hsl(${Math.round(h)}, ${Math.round(s)}%, ${Math.round(l)}%)`;
 }
 
-function randomHsl(): Hsl {
+function randomHSL(): HSL {
   return {
     h: Math.random() * 360,
     s: 40 + Math.random() * 60,
@@ -37,7 +38,7 @@ function randomHsl(): Hsl {
   };
 }
 
-function hexToHsl(hex: string): Hsl {
+function hexToHSL(hex: string): HSL {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
@@ -64,7 +65,7 @@ function hexToHsl(hex: string): Hsl {
   return { h, s: s * 100, l: l * 100 };
 }
 
-function hslToHex({ h, s, l }: Hsl): string {
+function hslToHex({ h, s, l }: HSL): string {
   const sN = s / 100;
   const lN = l / 100;
   const c = (1 - Math.abs(2 * lN - 1)) * sN;
@@ -87,18 +88,24 @@ function hslToHex({ h, s, l }: Hsl): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-const lighter = (c: Hsl): Hsl => ({ h: c.h, s: c.s, l: clamp(c.l + 18, 0, 88) });
-const darker = (c: Hsl): Hsl => ({ h: c.h, s: c.s, l: clamp(c.l - 22, 12, 100) });
-const muted = (c: Hsl): Hsl => ({ h: c.h, s: clamp(c.s * 0.4, 15, 100), l: c.l });
+function lighter(c: HSL): HSL {
+  return { h: c.h, s: c.s, l: clamp(c.l + 18, 0, 88) };
+}
+function darker(c: HSL): HSL {
+  return { h: c.h, s: c.s, l: clamp(c.l - 22, 12, 100) };
+}
+function muted(c: HSL): HSL {
+  return { h: c.h, s: clamp(c.s * 0.4, 15, 100), l: c.l };
+}
 
-function derivePalette(current: Hsl): {
-  same: Hsl[];
-  complement: Hsl[];
-  triadic: Hsl[];
+function derivePalette(current: HSL): {
+  same: HSL[];
+  complement: HSL[];
+  triadic: HSL[];
 } {
-  const comp: Hsl = { h: (current.h + 180) % 360, s: current.s, l: current.l };
-  const tri1: Hsl = { h: (current.h + 120) % 360, s: current.s, l: current.l };
-  const tri2: Hsl = { h: (current.h + 240) % 360, s: current.s, l: current.l };
+  const comp: HSL = { h: (current.h + 180) % 360, s: current.s, l: current.l };
+  const tri1: HSL = { h: (current.h + 120) % 360, s: current.s, l: current.l };
+  const tri2: HSL = { h: (current.h + 240) % 360, s: current.s, l: current.l };
   return {
     same: [current, lighter(current), darker(current), muted(current)],
     complement: [comp, lighter(comp), darker(comp), muted(comp)],
@@ -123,7 +130,7 @@ export default function Home() {
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
-  const [currentColor, setCurrentColor] = useState<Hsl>(DEFAULT_COLOR);
+  const [currentColor, setCurrentColor] = useState<HSL>(DEFAULT_COLOR);
   const palette = useMemo(() => derivePalette(currentColor), [currentColor]);
   const currentCss = useMemo(() => hslToCss(currentColor), [currentColor]);
   const customHex = useMemo(() => hslToHex(currentColor), [currentColor]);
@@ -246,7 +253,7 @@ export default function Home() {
 
   const handleMouseLeave = () => setHoveredIndex(null);
 
-  const renderSwatch = (color: Hsl, key: string) => {
+  const renderSwatch = (color: HSL, key: string) => {
     const css = hslToCss(color);
     const isSelected = css === currentCss;
     return (
@@ -287,7 +294,7 @@ export default function Home() {
         <button
           type="button"
           aria-label="Roll random color"
-          onClick={() => setCurrentColor(randomHsl())}
+          onClick={() => setCurrentColor(randomHSL())}
           title="Roll a random color"
           style={{
             ...SWATCH_BASE_STYLE,
@@ -316,7 +323,7 @@ export default function Home() {
           type="color"
           aria-label="Custom color"
           value={customHex}
-          onChange={(e) => setCurrentColor(hexToHsl(e.target.value))}
+          onChange={(e) => setCurrentColor(hexToHSL(e.target.value))}
           style={{
             width: 28,
             height: 28,
