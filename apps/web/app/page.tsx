@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Delaunay } from "d3-delaunay";
-import type { Point } from "@repo/api";
 import { trpc } from "../utils/trpc";
 
 const WIDTH = 800;
@@ -110,36 +109,17 @@ function derivePalette(current: Hsl): {
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const utils = trpc.useUtils();
+  // Pull model: re-fetch the shared point set on an interval so changes made by
+  // other clients show up. Mutations also invalidate on success so your own
+  // edits appear immediately rather than waiting for the next tick.
   const pointsQuery = trpc.getPoints.useQuery(undefined, {
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
+    refetchInterval: 1500,
   });
-  const addPoint = trpc.addPoint.useMutation();
-  const deletePoint = trpc.deletePoint.useMutation();
-
-  useEffect(() => {
-    const source = new EventSource("/api/events");
-
-    source.addEventListener("snapshot", (e) => {
-      utils.getPoints.setData(undefined, JSON.parse(e.data) as Point[]);
-    });
-    source.addEventListener("added", (e) => {
-      const { point } = JSON.parse(e.data) as { point: Point };
-      utils.getPoints.setData(undefined, (prev) => {
-        if (!prev) return [point];
-        if (prev.some((p) => p.id === point.id)) return prev;
-        return [...prev, point];
-      });
-    });
-    source.addEventListener("removed", (e) => {
-      const { id } = JSON.parse(e.data) as { id: string };
-      utils.getPoints.setData(undefined, (prev) =>
-        prev ? prev.filter((p) => p.id !== id) : prev,
-      );
-    });
-
-    return () => source.close();
-  }, [utils]);
+  const invalidatePoints = () => utils.getPoints.invalidate();
+  const addPoint = trpc.addPoint.useMutation({ onSuccess: invalidatePoints });
+  const deletePoint = trpc.deletePoint.useMutation({
+    onSuccess: invalidatePoints,
+  });
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);

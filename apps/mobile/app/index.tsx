@@ -9,7 +9,6 @@ import {
 import Svg, { Polygon, Circle, Rect } from "react-native-svg";
 import { Delaunay } from "d3-delaunay";
 import { trpc } from "../utils/trpc";
-import { useRealtimePoints } from "../utils/useRealtimePoints";
 import { Palette } from "../components/Palette";
 import { HslSliders } from "../components/HslSliders";
 import { hslToString, randomHSL, type HSL } from "../utils/colors";
@@ -23,14 +22,17 @@ const DELETE_COLOR = "#e11d48";
 const PREVIEW_DELAY = 180;
 
 export default function HomeScreen() {
-  useRealtimePoints();
-
+  const utils = trpc.useUtils();
+  // Pull model: poll the shared point set so other clients' changes appear, and
+  // invalidate on mutation success so your own edits show up immediately.
   const pointsQuery = trpc.getPoints.useQuery(undefined, {
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
+    refetchInterval: 1500,
   });
-  const addPoint = trpc.addPoint.useMutation();
-  const deletePoint = trpc.deletePoint.useMutation();
+  const invalidatePoints = () => utils.getPoints.invalidate();
+  const addPoint = trpc.addPoint.useMutation({ onSuccess: invalidatePoints });
+  const deletePoint = trpc.deletePoint.useMutation({
+    onSuccess: invalidatePoints,
+  });
 
   const points = pointsQuery.data;
 

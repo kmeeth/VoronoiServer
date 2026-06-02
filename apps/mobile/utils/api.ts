@@ -16,4 +16,3 @@ function deriveApiBase(): string {
 const API_BASE = deriveApiBase();
 
 export const TRPC_URL = `${API_BASE}/api/trpc`;
-export const EVENTS_URL = `${API_BASE}/api/events`;
