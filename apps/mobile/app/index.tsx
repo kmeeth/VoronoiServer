@@ -12,6 +12,7 @@ import { trpc } from "../utils/trpc";
 import { Palette } from "../components/Palette";
 import { HslSliders } from "../components/HslSliders";
 import { hslToString, randomHSL, type HSL } from "../utils/colors";
+import { letterboxToViewBox, nearestPointId } from "../utils/geometry";
 
 const WIDTH = 800;
 const HEIGHT = 600;
@@ -53,26 +54,19 @@ export default function HomeScreen() {
     });
   };
 
-  // Invert the letterbox transform; returns null for presses in the margins.
+  // Map a press into viewBox coordinates. Prefer locationX/locationY — relative
+  // to the canvas and free of the status-bar/header offset measureInWindow can
+  // introduce on Android. react-native-web leaves them empty for synthetic
+  // touch, so fall back to absolute pageX/pageY minus the measured canvas
+  // position there. The letterbox inversion lives in the tested geometry helper.
   const toViewBox = (e: GestureResponderEvent): { x: number; y: number } | null => {
     const { x: rx, y: ry, width: cw, height: ch } = canvasRect.current;
-    if (cw === 0 || ch === 0) return null;
-    // Prefer locationX/locationY — they're relative to the canvas and free of
-    // the status-bar/header offset that measureInWindow can introduce on
-    // Android. react-native-web leaves them empty for synthetic touch, so fall
-    // back to absolute pageX/pageY minus the measured canvas position there.
     const ne = e.nativeEvent;
     const hasLocal =
       Number.isFinite(ne.locationX) && Number.isFinite(ne.locationY);
     const localX = hasLocal ? ne.locationX : ne.pageX - rx;
     const localY = hasLocal ? ne.locationY : ne.pageY - ry;
-    const scale = Math.min(cw / WIDTH, ch / HEIGHT);
-    const offsetX = (cw - WIDTH * scale) / 2;
-    const offsetY = (ch - HEIGHT * scale) / 2;
-    const x = (localX - offsetX) / scale;
-    const y = (localY - offsetY) / scale;
-    if (x < 0 || x > WIDTH || y < 0 || y > HEIGHT) return null;
-    return { x, y };
+    return letterboxToViewBox(localX, localY, cw, ch, WIDTH, HEIGHT);
   };
 
   const handleAdd = (e: GestureResponderEvent) => {
@@ -84,22 +78,6 @@ export default function HomeScreen() {
       y: Math.round(p.y),
       color: hslToString(selected),
     });
-  };
-
-  // A Voronoi cell is the region nearest its seed, so the cell under a press is
-  // the closest seed — no per-polygon hit test needed.
-  const nearestId = (px: number, py: number): string | null => {
-    if (!points || points.length === 0) return null;
-    let id: string | null = null;
-    let best = Infinity;
-    for (const pt of points) {
-      const d = (pt.x - px) ** 2 + (pt.y - py) ** 2;
-      if (d < best) {
-        best = d;
-        id = pt.id;
-      }
-    }
-    return id;
   };
 
   const clearPreview = () => {
@@ -116,14 +94,14 @@ export default function HomeScreen() {
     const p = toViewBox(e);
     if (!p) return;
     previewTimer.current = setTimeout(() => {
-      setPendingDeleteId(nearestId(p.x, p.y));
+      setPendingDeleteId(nearestPointId(points ?? [], p.x, p.y));
     }, PREVIEW_DELAY);
   };
 
   const handleLongPress = (e: GestureResponderEvent) => {
     const p = toViewBox(e);
     if (!p) return;
-    const id = nearestId(p.x, p.y);
+    const id = nearestPointId(points ?? [], p.x, p.y);
     if (id) deletePoint.mutate({ id });
   };
 
