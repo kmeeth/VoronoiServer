@@ -63,7 +63,7 @@ The only things you must **not** cross-normalize are **platform-mandated constru
 
 ### 3a. Code quality
 
-Read both `~/.claude/skills/lint-llm-slop/SKILL.md` (the slop catalog and what is *not* slop) and `.claude/skills/lint-llm-slop/SKILL.md` (this repo's verification specifics). Apply that catalog at **aggressive** level (`[C]` + `[A]`). Honor its "What is NOT slop" exclusions verbatim — WHY-comments, boundary validation, perf-critical `useMemo`, single-impl interfaces with external consumers, intentional duplication.
+Read both `~/.claude/skills/lint-llm-slop/SKILL.md` (the slop catalog and what is *not* slop) and `.claude/skills/lint-llm-slop/SKILL.md` (this repo's verification specifics). **Borrow only the *criteria* — the slop catalog and the exclusions. Ignore lint-llm-slop's *procedure* entirely: its `.claude/llm-slop-baseline` SHA and "files changed since the baseline" scoping do NOT apply here.** grumpy-auditor always audits the entire repo (Step 1), every run. Apply the catalog at **aggressive** level (`[C]` + `[A]`). Honor its "What is NOT slop" exclusions verbatim — WHY-comments, boundary validation, perf-critical `useMemo`, single-impl interfaces with external consumers, intentional duplication.
 
 ### 3b. Consistency (the core of this skill)
 
