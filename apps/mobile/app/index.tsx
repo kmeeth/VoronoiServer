@@ -22,17 +22,48 @@ const DELETE_COLOR = "#e11d48";
 // long enough to skip incidental taps, short enough to telegraph the delete.
 const PREVIEW_DELAY = 180;
 
+// Temporary client-side id for an optimistically-added point, replaced by the
+// server's real id on the next refetch. Avoids crypto.randomUUID (absent on
+// React Native) so it matches the web client's identical pattern.
+function optimisticId(): string {
+  return `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export default function HomeScreen() {
   const utils = trpc.useUtils();
-  // Pull model: poll the shared point set so other clients' changes appear, and
-  // invalidate on mutation success so your own edits show up immediately.
+  // Pull model: poll the shared point set so other clients' changes appear.
+  // Your own mutations apply optimistically — the canvas updates on tap, before
+  // the server write (a remote serverless DB round-trip) completes — then roll
+  // back on error and reconcile against the server on settle.
   const pointsQuery = trpc.getPoints.useQuery(undefined, {
     refetchInterval: 1500,
   });
-  const invalidatePoints = () => utils.getPoints.invalidate();
-  const addPoint = trpc.addPoint.useMutation({ onSuccess: invalidatePoints });
+  const addPoint = trpc.addPoint.useMutation({
+    onMutate: async (input) => {
+      await utils.getPoints.cancel();
+      const previous = utils.getPoints.getData();
+      const optimistic = { id: optimisticId(), ...input };
+      utils.getPoints.setData(undefined, (old) => [...(old ?? []), optimistic]);
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) utils.getPoints.setData(undefined, context.previous);
+    },
+    onSettled: () => utils.getPoints.invalidate(),
+  });
   const deletePoint = trpc.deletePoint.useMutation({
-    onSuccess: invalidatePoints,
+    onMutate: async ({ id }) => {
+      await utils.getPoints.cancel();
+      const previous = utils.getPoints.getData();
+      utils.getPoints.setData(undefined, (old) =>
+        (old ?? []).filter((p) => p.id !== id),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) utils.getPoints.setData(undefined, context.previous);
+    },
+    onSettled: () => utils.getPoints.invalidate(),
   });
 
   const points = pointsQuery.data;
