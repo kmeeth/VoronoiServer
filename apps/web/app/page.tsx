@@ -26,6 +26,13 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+// Temporary client-side id for an optimistically-added point, replaced by the
+// server's real id on the next refetch. Avoids crypto.randomUUID so the same
+// helper works unchanged on React Native (mobile uses the identical pattern).
+function optimisticId(): string {
+  return `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function hslToCss({ h, s, l }: HSL): string {
   return `hsl(${Math.round(h)}, ${Math.round(s)}%, ${Math.round(l)}%)`;
 }
@@ -116,16 +123,39 @@ function derivePalette(current: HSL): {
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const utils = trpc.useUtils();
-  // Pull model: re-fetch the shared point set on an interval so changes made by
-  // other clients show up. Mutations also invalidate on success so your own
-  // edits appear immediately rather than waiting for the next tick.
+  // Pull model: poll the shared point set so other clients' changes appear.
+  // Your own mutations apply optimistically — the canvas updates on click,
+  // before the server write (a remote serverless DB round-trip) completes —
+  // then roll back on error and reconcile against the server on settle.
   const pointsQuery = trpc.getPoints.useQuery(undefined, {
     refetchInterval: 1500,
   });
-  const invalidatePoints = () => utils.getPoints.invalidate();
-  const addPoint = trpc.addPoint.useMutation({ onSuccess: invalidatePoints });
+  const addPoint = trpc.addPoint.useMutation({
+    onMutate: async (input) => {
+      await utils.getPoints.cancel();
+      const previous = utils.getPoints.getData();
+      const optimistic = { id: optimisticId(), ...input };
+      utils.getPoints.setData(undefined, (old) => [...(old ?? []), optimistic]);
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) utils.getPoints.setData(undefined, context.previous);
+    },
+    onSettled: () => utils.getPoints.invalidate(),
+  });
   const deletePoint = trpc.deletePoint.useMutation({
-    onSuccess: invalidatePoints,
+    onMutate: async ({ id }) => {
+      await utils.getPoints.cancel();
+      const previous = utils.getPoints.getData();
+      utils.getPoints.setData(undefined, (old) =>
+        (old ?? []).filter((p) => p.id !== id),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) utils.getPoints.setData(undefined, context.previous);
+    },
+    onSettled: () => utils.getPoints.invalidate(),
   });
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
