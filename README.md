@@ -4,7 +4,11 @@ A real-time, multi-user collaborative Voronoi diagram. The server holds a single
 
 ## Status
 
-The web canvas renders the Voronoi tessellation for the current set of points (cells filled with each seed's color, dark cell boundaries, white-bordered seed markers). Adding (click) and deleting (shift-click) work end-to-end; every client polls for the shared point set on a short interval, so changes propagate to all connected clients within ~1.5s. The mobile client is at parity: tap to add, long-press to delete (with a delete-target preview), palette and custom HSL color pickers, and the same live updates. Caveats:
+The web canvas renders the Voronoi tessellation for the current set of points (cells filled with each seed's color, dark cell boundaries, white-bordered seed markers). Adding (click) and deleting (shift-click) work end-to-end. Your own edits apply **optimistically** — the canvas updates the instant you click, before the server write completes — while other clients' changes arrive within ~1.5s via polling. The mobile client is at parity: tap to add, long-press to delete (with a delete-target preview), palette and custom HSL color pickers, and the same live updates.
+
+**Live:** deployed on Vercel at https://voronoi-server-web.vercel.app.
+
+Notes:
 
 - Server state is persisted in a MySQL database (TiDB Serverless) via Prisma, so points survive restarts and are shared across instances — this is what makes serverless (Vercel) deployment viable.
 - Running the server (or any DB command) requires a `DATABASE_URL` MySQL connection string. See [CLAUDE.md](./CLAUDE.md) for where it goes.
@@ -18,7 +22,7 @@ The web canvas renders the Voronoi tessellation for the current set of points (c
 
 ## Quick start
 
-Requires Node.js 20+ and pnpm.
+Requires Node.js 20+ and pnpm, plus a `DATABASE_URL` (MySQL connection string) — put it in `packages/api/.env` and `apps/web/.env.local` (both gitignored). See [CLAUDE.md](./CLAUDE.md) for details.
 
 ```bash
 pnpm install
@@ -57,4 +61,4 @@ pnpm build         # production build
 pnpm format        # apply Prettier formatting
 ```
 
-See [CLAUDE.md](./CLAUDE.md) for architecture notes, conventions, and the current realtime/transport plan.
+See [CLAUDE.md](./CLAUDE.md) for architecture, persistence, realtime, and deployment notes plus conventions.
