@@ -40,5 +40,8 @@ yarn-error.log*
 # Claude Code — track shared skills/agents/settings, ignore per-user local state
 .claude/settings.local.json
 
+# MCP config holds real DB credentials — keep it local; commit .mcp.json.example instead
+.mcp.json
+
 # Persistent verification worktree used by the /ship skill (see .claude/skills/ship/SKILL.md)
 /wt-verify/
