@@ -6,15 +6,15 @@ A real-time, multi-user collaborative Voronoi diagram. The server holds a single
 
 The web canvas renders the Voronoi tessellation for the current set of points (cells filled with each seed's color, dark cell boundaries, white-bordered seed markers). Adding (click) and deleting (shift-click) work end-to-end; every client polls for the shared point set on a short interval, so changes propagate to all connected clients within ~1.5s. The mobile client is at parity: tap to add, long-press to delete (with a delete-target preview), palette and custom HSL color pickers, and the same live updates. Caveats:
 
-- Server state is in-memory; restarting the server clears all points.
-- Single-process only — the point set lives in module memory, so multiple instances wouldn't share state. A shared database is the next step (and what makes serverless deployment viable).
+- Server state is persisted in a MySQL database (TiDB Serverless) via Prisma, so points survive restarts and are shared across instances — this is what makes serverless (Vercel) deployment viable.
+- Running the server (or any DB command) requires a `DATABASE_URL` MySQL connection string. See [CLAUDE.md](./CLAUDE.md) for where it goes.
 
 ## Stack
 
 - pnpm + Turborepo monorepo
 - `apps/web` — Next.js 16 (React 19) frontend and tRPC backend in one process
 - `apps/mobile` — Expo SDK 54 (React 19, React Native) — at parity with the web client; requires Android Studio / Xcode / Expo Go to run
-- `packages/api` — shared tRPC router consumed by both apps
+- `packages/api` — shared tRPC router consumed by both apps; also owns persistence (Prisma + MySQL)
 
 ## Quick start
 

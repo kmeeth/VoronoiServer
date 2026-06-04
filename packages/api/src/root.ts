@@ -17,8 +17,8 @@ export const appRouter = router({
 
   deletePoint: publicProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(({ input }) => {
-      store.remove(input.id);
+    .mutation(async ({ input }) => {
+      await store.remove(input.id);
     }),
 });
 

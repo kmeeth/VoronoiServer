@@ -12,7 +12,7 @@ VoronoiServer is a real-time, multi-user collaborative Voronoi diagram. The serv
 1. Add a point — click-to-place within the bounded plane. No other constraints (no dedup, no per-user limits).
 2. Delete an existing point — any user can delete any point, regardless of who created it.
 
-**Realtime:** mutations propagate to all connected clients instantly.
+**Realtime:** mutations propagate to all connected clients within a poll interval (~1.5s); your own edits appear immediately. See the Realtime (polling) section below.
 
 ## Commands
 
@@ -37,7 +37,15 @@ pnpm format
 
 # Install dependencies
 pnpm install
+
+# Database (Prisma + MySQL). Run from packages/api or via the filter.
+pnpm --filter @repo/api db:generate   # regenerate the Prisma client after schema edits
+pnpm --filter @repo/api db:migrate    # create/apply a migration (prisma migrate dev)
 ```
+
+A `DATABASE_URL` (MySQL connection string) must be set for any DB command or for the
+running server. Put it in `packages/api/.env` (for the Prisma CLI) and `apps/web/.env.local`
+(for the Next.js runtime). Both are gitignored.
 
 Mobile (`apps/mobile`) uses `expo start` under the hood, which is interactive. It must be run separately from the Turbo dev task.
 
@@ -55,7 +63,7 @@ This is a pnpm + Turborepo monorepo with two apps and three shared packages.
 
 ### Packages
 
-**`packages/api`** — The only truly shared code. Defines the tRPC router (`src/root.ts`) and exports `appRouter` and the `AppRouter` type. Both apps import from here. New API procedures go in `src/root.ts`; the type is automatically available to both frontends.
+**`packages/api`** — The only truly shared code. Defines the tRPC router (`src/root.ts`) and exports `appRouter` and the `AppRouter` type. Both apps import from here. New API procedures go in `src/root.ts`; the type is automatically available to both frontends. Persistence also lives here: the Prisma schema (`prisma/schema.prisma`), the PrismaClient singleton (`src/db.ts`), and the data-access layer (`src/store.ts`).
 
 **`packages/eslint-config`** and **`packages/typescript-config`** — Shared tooling config extended by both apps. No application logic.
 
@@ -68,9 +76,19 @@ This is a pnpm + Turborepo monorepo with two apps and three shared packages.
 
 ### Realtime (polling)
 
-Clients stay in sync by polling, not pushing. Both frontends call `getPoints` with React Query's `refetchInterval` (1500ms), so another client's add/delete shows up within a tick. Mutations additionally `invalidate` `getPoints` on success (`apps/web/app/page.tsx`, `apps/mobile/app/index.tsx`), so your own edits appear immediately instead of waiting for the next poll. The store (`packages/api/src/store.ts`) is a plain in-memory map with no event emitter — `getPoints` reads it on demand.
+Clients stay in sync by polling, not pushing. Both frontends call `getPoints` with React Query's `refetchInterval` (1500ms), so another client's add/delete shows up within a tick. Mutations additionally `invalidate` `getPoints` on success (`apps/web/app/page.tsx`, `apps/mobile/app/index.tsx`), so your own edits appear immediately instead of waiting for the next poll. The store (`packages/api/src/store.ts`) reads from the shared database on demand — there is no event emitter.
 
-This pull model is deliberately serverless-friendly: it has no long-lived connections, so it works unchanged across ephemeral, multi-instance hosting (e.g. Vercel) once the store is backed by a shared database rather than module memory. It replaced an earlier SSE transport (server-emitter + `EventSource`), which couldn't survive serverless's stateless, per-instance model. The tradeoff is latency (bounded by the interval) and steady polling traffic in exchange for that simplicity.
+This pull model is deliberately serverless-friendly: it has no long-lived connections, so it works unchanged across ephemeral, multi-instance hosting (e.g. Vercel). It replaced an earlier SSE transport (server-emitter + `EventSource`), which couldn't survive serverless's stateless, per-instance model. The tradeoff is latency (bounded by the interval) and steady polling traffic in exchange for that simplicity.
+
+### Persistence (Prisma + MySQL)
+
+Shared state lives in a MySQL database (TiDB Serverless), accessed through Prisma. This is what makes the polling model actually correct on serverless: every stateless instance reads/writes the same database rather than its own module memory (the previous in-memory `Map` could not survive multi-instance, ephemeral hosting).
+
+- **Schema:** `packages/api/prisma/schema.prisma` — one `Point` model (`id`, `x`, `y`, `color`).
+- **Client:** `packages/api/src/db.ts` exports a `PrismaClient` singleton (reused across hot reloads / warm invocations so the connection pool isn't exhausted).
+- **Data access:** `packages/api/src/store.ts` wraps Prisma in `list` / `add` / `remove`. The `Point` *contract type* is hand-defined there (not Prisma's generated type), so the frontends don't depend on Prisma. `remove` uses `deleteMany` so deleting an already-gone id is a no-op (idempotent, tolerant of concurrent deletes).
+- **Config:** `DATABASE_URL` env var (see Commands above). Prisma client is regenerated on install via the `postinstall` script.
+- **Inspecting the DB:** a local MCP server (`@benborla29/mcp-server-mysql`, read-only) can be pointed at the database for ad-hoc `SELECT`s. Copy `.mcp.json.example` to `.mcp.json` (gitignored — it holds credentials), fill in the TiDB host/user/password, and restart Claude Code to load it.
 
 ### Key constraints
 

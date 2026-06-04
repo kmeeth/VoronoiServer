@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "voronoi-db": {
+      "command": "npx",
+      "args": ["-y", "@benborla29/mcp-server-mysql"],
+      "env": {
+        "MYSQL_HOST": "<tidb-gateway-host>",
+        "MYSQL_PORT": "4000",
+        "MYSQL_USER": "<tidb-user>",
+        "MYSQL_PASS": "<tidb-password>",
+        "MYSQL_DB": "test",
+        "MYSQL_SSL": "true",
+        "ALLOW_INSERT_OPERATION": "false",
+        "ALLOW_UPDATE_OPERATION": "false",
+        "ALLOW_DELETE_OPERATION": "false"
+      }
+    }
+  }
+}
