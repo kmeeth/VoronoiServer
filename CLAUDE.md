@@ -76,7 +76,7 @@ This is a pnpm + Turborepo monorepo with two apps and three shared packages.
 
 ### Realtime (polling)
 
-Clients stay in sync by polling, not pushing. Both frontends call `getPoints` with React Query's `refetchInterval` (1500ms), so another client's add/delete shows up within a tick. Mutations additionally `invalidate` `getPoints` on success (`apps/web/app/page.tsx`, `apps/mobile/app/index.tsx`), so your own edits appear immediately instead of waiting for the next poll. The store (`packages/api/src/store.ts`) reads from the shared database on demand — there is no event emitter.
+Clients stay in sync by polling, not pushing. Both frontends call `getPoints` with React Query's `refetchInterval` (1500ms), so another client's add/delete shows up within a tick. Your *own* mutations apply **optimistically** (`apps/web/app/page.tsx`, `apps/mobile/app/index.tsx`): `onMutate` writes the change into the React Query cache immediately (a temporary client id via the shared `optimisticId` helper), `onError` rolls back to the prior snapshot, and `onSettled` invalidates to reconcile against the server. So your edit shows on click — not after the round-trip — which matters because the write is a remote serverless-DB round-trip (~0.6–1.4s in practice). The store (`packages/api/src/store.ts`) reads from the shared database on demand — there is no event emitter.
 
 This pull model is deliberately serverless-friendly: it has no long-lived connections, so it works unchanged across ephemeral, multi-instance hosting (e.g. Vercel). It replaced an earlier SSE transport (server-emitter + `EventSource`), which couldn't survive serverless's stateless, per-instance model. The tradeoff is latency (bounded by the interval) and steady polling traffic in exchange for that simplicity.
 
@@ -89,6 +89,26 @@ Shared state lives in a MySQL database (TiDB Serverless), accessed through Prism
 - **Data access:** `packages/api/src/store.ts` wraps Prisma in `list` / `add` / `remove`. The `Point` *contract type* is hand-defined there (not Prisma's generated type), so the frontends don't depend on Prisma. `remove` uses `deleteMany` so deleting an already-gone id is a no-op (idempotent, tolerant of concurrent deletes).
 - **Config:** `DATABASE_URL` env var (see Commands above). Prisma client is regenerated on install via the `postinstall` script.
 - **Inspecting the DB:** a local MCP server (`@benborla29/mcp-server-mysql`, read-only) can be pointed at the database for ad-hoc `SELECT`s. Copy `.mcp.json.example` to `.mcp.json` (gitignored — it holds credentials), fill in the TiDB host/user/password, and restart Claude Code to load it.
+
+### Deployment (Vercel)
+
+The web app is deployed on Vercel (live at `voronoi-server-web.vercel.app`). It auto-redeploys on merge to `main`.
+
+- **Project root directory:** `apps/web` (the app is not at the repo root — easy to miss when importing the project).
+- **`DATABASE_URL`** is set as a Vercel environment variable. Enable it for **Preview** as well as **Production**, or PR preview deployments 500 on every DB call.
+- **TiDB requires TLS** — the connection string must end with `?sslaccept=strict` (TiDB's copy-paste default omits it and points at the `sys` system DB; use `/test?sslaccept=strict`). This was the cause of an early "insecure transport prohibited" 500 in production.
+- **Preview deployments** (one per PR/branch) are Vercel-auth-protected, so anonymous requests hit an auth wall — test them in a logged-in browser. They share the **same** database as production.
+- The Prisma client is generated at build via `packages/api`'s `postinstall` (`prisma generate`); with `node-linker=hoisted` it resolves from the root `node_modules`.
+
+### Project skills (`.claude/skills/`)
+
+Repo-local Claude Code skills, invoked as `/<name>`. Each has a `SKILL.md`:
+
+- **`/lint-llm-slop`** — simplify LLM-style verbosity with strict parity (tracks a baseline in `.claude/llm-slop-baseline`).
+- **`/grumpy-auditor`** — whole-repo code-quality + cross-file consistency audit; leaves an uncommitted diff.
+- **`/security-sweep`** — whole-repo security audit (leaked secrets + OWASP/LLM vuln classes); reports findings, never auto-fixes. Named to avoid shadowing the built-in `/security-review`.
+- **`/explore-multiagent`** — decides sequential-vs-parallel-agent execution for a task; hands off a plan, never spawns. The audit skills above call it for their parallelize decision.
+- **`/ship`** — branch → verify → commit → push → open PR (stops before merge).
 
 ### Key constraints
 
